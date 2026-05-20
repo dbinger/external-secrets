@@ -59,6 +59,16 @@ on:
         required: false
       SECRETSERVER_URL:
         required: false
+      SECRETSERVER_ENABLED:
+        required: false
+      SECRETSERVER_SITE_ID:
+        required: false
+      SECRETSERVER_FOLDER_ID:
+        required: false
+      SECRETSERVER_TEMPLATE_ID:
+        required: false
+      SECRETSERVER_DATA_FIELD_ID:
+        required: false
       GRAFANA_URL:
         required: false
       GRAFANA_TOKEN:
@@ -245,6 +255,11 @@ jobs:
           SECRETSERVER_USERNAME: ${{ secrets.SECRETSERVER_USERNAME }}
           SECRETSERVER_PASSWORD: ${{ secrets.SECRETSERVER_PASSWORD }}
           SECRETSERVER_URL: ${{ secrets.SECRETSERVER_URL }}
+          SECRETSERVER_ENABLED: ${{ secrets.SECRETSERVER_ENABLED }}
+          SECRETSERVER_SITE_ID: ${{ secrets.SECRETSERVER_SITE_ID }}
+          SECRETSERVER_FOLDER_ID: ${{ secrets.SECRETSERVER_FOLDER_ID }}
+          SECRETSERVER_TEMPLATE_ID: ${{ secrets.SECRETSERVER_TEMPLATE_ID }}
+          SECRETSERVER_DATA_FIELD_ID: ${{ secrets.SECRETSERVER_DATA_FIELD_ID }}
           GRAFANA_URL: ${{ secrets.GRAFANA_URL }}
           GRAFANA_TOKEN: ${{ secrets.GRAFANA_TOKEN }}
           AKEYLESS_ACCESS_ID: ${{ secrets.AKEYLESS_ACCESS_ID }}

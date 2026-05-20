@@ -24,6 +24,11 @@ import (
 	"github.com/onsi/gomega"
 )
 
+// requiredFieldValue is a placeholder written into required template fields the
+// test does not otherwise populate, so CreateSecret succeeds. The e2e instance
+// uses a purpose-built template, so a fixed value is sufficient.
+const requiredFieldValue = "external-secrets-e2e"
+
 type secretStoreProvider struct {
 	api       *server.Server
 	cfg       *config
@@ -52,22 +57,60 @@ func (p *secretStoreProvider) CreateSecret(key string, val framework.SecretEntry
 	err := json.Unmarshal([]byte(val.Value), &data)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	fields := make([]server.SecretField, 1)
-	fields[0].FieldID = 329 // Data
-	fields[0].ItemValue = val.Value
+	fields := []server.SecretField{
+		{
+			FieldID:   p.cfg.dataFieldID,
+			ItemValue: val.Value,
+		},
+	}
+
+	template, err := p.api.SecretTemplate(p.cfg.secretTemplateID)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	for _, field := range template.Fields {
+		if field.IsRequired {
+			fields = append(fields, server.SecretField{
+				FieldID:   field.SecretTemplateFieldID,
+				ItemValue: requiredFieldValue,
+			})
+		}
+	}
+	fields = uniqueFields(fields)
 
 	s, err := p.api.CreateSecret(server.Secret{
-		SecretTemplateID: 6051, // custom template
-		SiteID:           1,
-		FolderID:         10,
+		SecretTemplateID: p.cfg.secretTemplateID,
+		SiteID:           p.cfg.siteID,
+		FolderID:         p.cfg.folderID,
 		Name:             key,
 		Fields:           fields,
 	})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(err).ToNot(gomega.HaveOccurred(),
+		"failed creating SecretServer secret with site=%d folder=%d template=%d dataField=%d fieldIDs=%v",
+		p.cfg.siteID, p.cfg.folderID, p.cfg.secretTemplateID, p.cfg.dataFieldID, fieldIDs(fields))
 	p.secretID[key] = s.ID
 }
 
 func (p *secretStoreProvider) DeleteSecret(key string) {
 	err := p.api.DeleteSecret(p.secretID[key])
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+}
+
+func uniqueFields(fields []server.SecretField) []server.SecretField {
+	seen := make(map[int]struct{}, len(fields))
+	result := make([]server.SecretField, 0, len(fields))
+	for _, field := range fields {
+		if _, ok := seen[field.FieldID]; ok {
+			continue
+		}
+		seen[field.FieldID] = struct{}{}
+		result = append(result, field)
+	}
+	return result
+}
+
+func fieldIDs(fields []server.SecretField) []int {
+	ids := make([]int, 0, len(fields))
+	for _, field := range fields {
+		ids = append(ids, field.FieldID)
+	}
+	return ids
 }

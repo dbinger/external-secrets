@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var _ = PDescribe("[secretserver]", Label("secretserver"), func() {
+var _ = Describe("[secretserver]", Label("secretserver"), func() {
 
 	f := framework.New("eso-secretserver")
 
@@ -38,6 +38,9 @@ var _ = PDescribe("[secretserver]", Label("secretserver"), func() {
 	provider := &secretStoreProvider{}
 
 	BeforeEach(func() {
+		if !secretServerEnabled() {
+			Skip("[secretserver] e2e disabled: set SECRETSERVER_ENABLED=true (and the SECRETSERVER_* configuration) to enable")
+		}
 
 		cfg, err := loadConfigFromEnv()
 		Expect(err).ToNot(HaveOccurred())

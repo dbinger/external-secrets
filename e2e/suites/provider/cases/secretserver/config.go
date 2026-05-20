@@ -19,12 +19,27 @@ package secretserver
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 type config struct {
-	username  string
-	password  string
-	serverURL string
+	username         string
+	password         string
+	serverURL        string
+	siteID           int
+	folderID         int
+	secretTemplateID int
+	dataFieldID      int
+}
+
+// secretServerEnabled reports whether the SecretServer e2e suite should run.
+// SECRETSERVER_ENABLED is an explicit opt-in switch: unless it is set to a
+// truthy value (e.g. "true") the specs skip, so the suite never runs unless a
+// maintainer deliberately turns it on. When enabled, loadConfigFromEnv surfaces
+// any missing or invalid configuration as a failure rather than a silent skip.
+func secretServerEnabled() bool {
+	enabled, _ := strconv.ParseBool(os.Getenv("SECRETSERVER_ENABLED"))
+	return enabled
 }
 
 func loadConfigFromEnv() (*config, error) {
@@ -45,6 +60,27 @@ func loadConfigFromEnv() (*config, error) {
 		return nil, err
 	}
 
+	// Instance-specific IDs. These have no defaults: values differ per Secret
+	// Server instance, so discover them for the target instance (the example
+	// values shown are only illustrative). SECRETSERVER_DATA_FIELD_ID must be a
+	// non-file template field, which holds the JSON payload.
+	cfg.siteID, err = getIntEnv("SECRETSERVER_SITE_ID") // e.g. 1
+	if err != nil {
+		return nil, err
+	}
+	cfg.folderID, err = getIntEnv("SECRETSERVER_FOLDER_ID") // e.g. 14
+	if err != nil {
+		return nil, err
+	}
+	cfg.secretTemplateID, err = getIntEnv("SECRETSERVER_TEMPLATE_ID") // e.g. 2 (a "Password" template)
+	if err != nil {
+		return nil, err
+	}
+	cfg.dataFieldID, err = getIntEnv("SECRETSERVER_DATA_FIELD_ID") // e.g. 60 (a non-file field)
+	if err != nil {
+		return nil, err
+	}
+
 	return &cfg, nil
 }
 
@@ -54,4 +90,16 @@ func getEnv(name string) (string, error) {
 		return "", fmt.Errorf("environment variable %q is not set", name)
 	}
 	return value, nil
+}
+
+func getIntEnv(name string) (int, error) {
+	value, ok := os.LookupEnv(name)
+	if !ok || value == "" {
+		return 0, fmt.Errorf("environment variable %q is not set", name)
+	}
+	intValue, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("environment variable %q must be an integer: %w", name, err)
+	}
+	return intValue, nil
 }
