@@ -52,22 +52,67 @@ func (p *secretStoreProvider) CreateSecret(key string, val framework.SecretEntry
 	err := json.Unmarshal([]byte(val.Value), &data)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-	fields := make([]server.SecretField, 1)
-	fields[0].FieldID = 329 // Data
-	fields[0].ItemValue = val.Value
+	fields := []server.SecretField{
+		{
+			FieldID:   p.cfg.dataFieldID,
+			ItemValue: val.Value,
+		},
+	}
+
+	if p.cfg.requiredPasswordFieldID > 0 {
+		fields = append(fields, server.SecretField{
+			FieldID:   p.cfg.requiredPasswordFieldID,
+			ItemValue: p.cfg.requiredPasswordValue,
+		})
+	}
+
+	template, err := p.api.SecretTemplate(p.cfg.secretTemplateID)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	for _, field := range template.Fields {
+		if field.IsRequired {
+			fields = append(fields, server.SecretField{
+				FieldID:   field.SecretTemplateFieldID,
+				ItemValue: p.cfg.requiredPasswordValue,
+			})
+		}
+	}
+	fields = uniqueFields(fields)
 
 	s, err := p.api.CreateSecret(server.Secret{
-		SecretTemplateID: 6051, // custom template
-		SiteID:           1,
-		FolderID:         10,
+		SecretTemplateID: p.cfg.secretTemplateID,
+		SiteID:           p.cfg.siteID,
+		FolderID:         p.cfg.folderID,
 		Name:             key,
 		Fields:           fields,
 	})
-	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(err).ToNot(gomega.HaveOccurred(),
+		"failed creating SecretServer secret with site=%d folder=%d template=%d dataField=%d fieldIDs=%v",
+		p.cfg.siteID, p.cfg.folderID, p.cfg.secretTemplateID, p.cfg.dataFieldID, fieldIDs(fields))
 	p.secretID[key] = s.ID
 }
 
 func (p *secretStoreProvider) DeleteSecret(key string) {
 	err := p.api.DeleteSecret(p.secretID[key])
 	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+}
+
+func uniqueFields(fields []server.SecretField) []server.SecretField {
+	seen := make(map[int]struct{}, len(fields))
+	result := make([]server.SecretField, 0, len(fields))
+	for _, field := range fields {
+		if _, ok := seen[field.FieldID]; ok {
+			continue
+		}
+		seen[field.FieldID] = struct{}{}
+		result = append(result, field)
+	}
+	return result
+}
+
+func fieldIDs(fields []server.SecretField) []int {
+	ids := make([]int, 0, len(fields))
+	for _, field := range fields {
+		ids = append(ids, field.FieldID)
+	}
+	return ids
 }

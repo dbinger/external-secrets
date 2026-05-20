@@ -19,12 +19,19 @@ package secretserver
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 type config struct {
-	username  string
-	password  string
-	serverURL string
+	username                string
+	password                string
+	serverURL               string
+	siteID                  int
+	folderID                int
+	secretTemplateID        int
+	dataFieldID             int
+	requiredPasswordFieldID int
+	requiredPasswordValue   string
 }
 
 func loadConfigFromEnv() (*config, error) {
@@ -45,6 +52,31 @@ func loadConfigFromEnv() (*config, error) {
 		return nil, err
 	}
 
+	cfg.siteID, err = getOptionalIntEnv("SECRETSERVER_SITE_ID", 1)
+	if err != nil {
+		return nil, err
+	}
+	cfg.folderID, err = getOptionalIntEnv("SECRETSERVER_FOLDER_ID", 10)
+	if err != nil {
+		return nil, err
+	}
+	cfg.secretTemplateID, err = getOptionalIntEnv("SECRETSERVER_TEMPLATE_ID", 6051)
+	if err != nil {
+		return nil, err
+	}
+	cfg.dataFieldID, err = getOptionalIntEnv("SECRETSERVER_DATA_FIELD_ID", 329)
+	if err != nil {
+		return nil, err
+	}
+	cfg.requiredPasswordFieldID, err = getOptionalIntEnv("SECRETSERVER_REQUIRED_PASSWORD_FIELD_ID", 0)
+	if err != nil {
+		return nil, err
+	}
+	cfg.requiredPasswordValue = "external-secrets-e2e"
+	if value := os.Getenv("SECRETSERVER_REQUIRED_PASSWORD_VALUE"); value != "" {
+		cfg.requiredPasswordValue = value
+	}
+
 	return &cfg, nil
 }
 
@@ -54,4 +86,16 @@ func getEnv(name string) (string, error) {
 		return "", fmt.Errorf("environment variable %q is not set", name)
 	}
 	return value, nil
+}
+
+func getOptionalIntEnv(name string, defaultValue int) (int, error) {
+	value, ok := os.LookupEnv(name)
+	if !ok || value == "" {
+		return defaultValue, nil
+	}
+	intValue, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("environment variable %q must be an integer: %w", name, err)
+	}
+	return intValue, nil
 }
